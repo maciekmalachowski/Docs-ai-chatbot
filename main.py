@@ -10,7 +10,7 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain_community.vectorstores import FAISS
 from pypdf import PdfReader
 # from plotai import PlotAI
-# from langchain_openai import OpenAI
+
 
 def get_pdf_text(pdfs):
     text = ''
@@ -35,9 +35,7 @@ def get_vectorstore(text_chunks):
     vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
     return vectorstore
 
-def get_conversation_chain(vectorstore):
-    callbacks = [StreamingStdOutCallbackHandler()]
-    llm = GPT4All(model="./docs/model/mistral-7b-instruct-v0.1.Q4_0.gguf", callbacks=callbacks)
+def get_conversation_chain(vectorstore, llm):
     memory = ConversationBufferMemory(memory_key='chat_history', return_messages=True)
     conversation_chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
@@ -59,7 +57,12 @@ def hadle_userinput(user_question):
 def button_callback():
     st.session_state.button_clicked = True
 
+def input_callback():
+    st.session_state.button_clicked = False
+
 def main():
+    callbacks = [StreamingStdOutCallbackHandler()]
+    llm = GPT4All(model="./docs/model/mistral-7b-instruct-v0.1.Q4_0.gguf", callbacks=callbacks)
     st.set_page_config(
         page_title="Docs AI Chatbot",
         page_icon="./docs/icon/bot.png", 
@@ -73,31 +76,55 @@ def main():
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = None
 
+    if "file_type" not in st.session_state:
+        st.session_state.file_type = None
+
+    if "button_clicked" not in st.session_state:
+        st.session_state.button_clicked = False
+
     st.header("Ask your docs 📜")
-    user_files = st.file_uploader("Upload your docs", type=(["csv","pdf"]), accept_multiple_files=True)
-
-    # user question input
-    user_question = st.text_input("Ask a question about your document: ")
-
-    if user_question:
-        hadle_userinput(user_question)
+    user_files = [st.file_uploader("Upload your docs", type=(["csv","pdf"]), on_change=input_callback)]
 
     if len(user_files) != 0:
-        if st.button("Process", on_click=button_callback):
-            with st.spinner("Processing"):
+        if st.button("Process", use_container_width=True, on_click=button_callback):
+            if user_files[0].name.endswith(".pdf"):
+                st.session_state.file_type = "pdf"
+                with st.spinner("Processing..."):
 
-                # get pdf text
-                raw_text = get_pdf_text(user_files)
+                    # get pdf text
+                    raw_text = get_pdf_text(user_files)
 
-                # get the text chunks
-                text_chunks = get_text_chunks(raw_text)
+                    # get the text chunks
+                    text_chunks = get_text_chunks(raw_text)
 
-                # create vector store
-                vectorstore = get_vectorstore(text_chunks)
+                    # create vector store
+                    vectorstore = get_vectorstore(text_chunks)
 
-                # create conversation chain
-                st.session_state.conversation = get_conversation_chain(vectorstore)
-            print('DONE')
+                    # create conversation chain
+                    st.session_state.conversation = get_conversation_chain(vectorstore, llm)
+                print('DONE')
+            
+            else:
+        # TO DO CSV
+                st.session_state.file_type = "csv"
+                # agent = create_csv_agent(llm, user_files, verbose=True, agent_executor_kwargs={"handle_parsing_errors": True})
+                # response = agent.run(user_question)
+                # st.write(response)
+
+        if st.session_state.button_clicked:
+            # user question input
+            user_question = st.text_input("Ask a question about your document: ")
+
+            if user_question:
+                if st.session_state.file_type == "pdf":
+                    hadle_userinput(user_question)
+                elif st.session_state.file_type == "csv":
+                    agent = create_csv_agent(llm, user_files, verbose=True, agent_executor_kwargs={"handle_parsing_errors": True})
+                    response = agent.run(user_question)
+                    st.write(response)
+
+
+
 
 # TO DO PLOTAI
             # if user_file.name.endswith(".csv"):
@@ -105,12 +132,7 @@ def main():
 
 
 
-# TO DO CSV
-        # agent = create_csv_agent(llm, user_file, verbose=True, agent_executor_kwargs={"handle_parsing_errors": True})
 
-        # if user_question is not None and user_question != "":
-        #     response = agent.run(user_question)
-        #     st.write(response)
 
 if __name__ == "__main__":
     main()
