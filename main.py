@@ -1,6 +1,6 @@
 import streamlit as st
+import pandas as pd
 from streamlit_chat import message
-from langchain_experimental.agents import create_csv_agent
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.llms import GPT4All
@@ -9,7 +9,8 @@ from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain_community.vectorstores import FAISS
 from pypdf import PdfReader
-# from plotai import PlotAI
+import tempfile
+from langchain.document_loaders.csv_loader import CSVLoader
 
 
 def get_pdf_text(pdfs):
@@ -30,9 +31,23 @@ def get_text_chunks(text):
     chunks = text_splitter.split_text(text)
     return chunks
 
-def get_vectorstore(text_chunks):
+def get_vectorstore_pdf(text_chunks):
     embeddings = GPT4AllEmbeddings()
-    vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
+    vectorstore = FAISS.from_texts(text_chunks, embedding=embeddings)
+    return vectorstore
+
+def get_file_data(user_file):
+    # we use tempfile because CSVLoader only accepts a file_path
+    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+        tmp_file.write(user_file.getvalue())
+        tmp_file_path = tmp_file.name
+        loader = CSVLoader(file_path=tmp_file_path, encoding="utf-8", csv_args={'delimiter': ','})
+        data = loader.load()
+    return data
+
+def get_vectorstore_csv(data):
+    embeddings = GPT4AllEmbeddings()
+    vectorstore = FAISS.from_documents(data, embedding=embeddings)
     return vectorstore
 
 def get_conversation_chain(vectorstore, llm):
@@ -57,8 +72,11 @@ def hadle_userinput(user_question):
 def button_callback():
     st.session_state.button_clicked = True
 
-def input_callback():
+def uplader_callback():
     st.session_state.button_clicked = False
+
+def text_input_disable():
+    st.session_state.disabled = True
 
 def main():
     callbacks = [StreamingStdOutCallbackHandler()]
@@ -76,63 +94,48 @@ def main():
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = None
 
-    if "file_type" not in st.session_state:
-        st.session_state.file_type = None
-
     if "button_clicked" not in st.session_state:
         st.session_state.button_clicked = False
 
+    if "disabled" not in st.session_state:
+        st.session_state.input_disable = False
+
     st.header("Ask your docs 📜")
-    user_files = [st.file_uploader("Upload your docs", type=(["csv","pdf"]), on_change=input_callback)]
+    user_file = st.file_uploader("Upload your docs", type=(["csv","pdf"]), on_change=uplader_callback)
 
-    if len(user_files) != 0:
+    if user_file:
         if st.button("Process", use_container_width=True, on_click=button_callback):
-            if user_files[0].name.endswith(".pdf"):
-                st.session_state.file_type = "pdf"
+            if user_file.name.endswith(".pdf"):
                 with st.spinner("Processing..."):
-
                     # get pdf text
-                    raw_text = get_pdf_text(user_files)
-
+                    raw_text = get_pdf_text(user_file)
                     # get the text chunks
                     text_chunks = get_text_chunks(raw_text)
-
                     # create vector store
-                    vectorstore = get_vectorstore(text_chunks)
-
+                    vectorstore = get_vectorstore_pdf(text_chunks)
                     # create conversation chain
                     st.session_state.conversation = get_conversation_chain(vectorstore, llm)
-                print('DONE')
-            
+
             else:
-        # TO DO CSV
-                st.session_state.file_type = "csv"
-                # agent = create_csv_agent(llm, user_files, verbose=True, agent_executor_kwargs={"handle_parsing_errors": True})
-                # response = agent.run(user_question)
-                # st.write(response)
+                with st.spinner("Processing..."):
+                    # get file data 
+                    data = get_file_data(user_file)
+                    # create vector store
+                    vectorstore = get_vectorstore_csv(data)
+                    # create conversation chain
+                    st.session_state.conversation = get_conversation_chain(vectorstore, llm)
+                
 
         if st.session_state.button_clicked:
+            # display dataframe
+            df = pd.DataFrame(pd.read_csv(user_file))
+            st.dataframe(df)
             # user question input
+            # user_question = st.text_input("Ask a question about your document: ", disabled=st.session_state.input_disable, on_change=text_input_disable)
             user_question = st.text_input("Ask a question about your document: ")
-
             if user_question:
-                if st.session_state.file_type == "pdf":
-                    hadle_userinput(user_question)
-                elif st.session_state.file_type == "csv":
-                    agent = create_csv_agent(llm, user_files, verbose=True, agent_executor_kwargs={"handle_parsing_errors": True})
-                    response = agent.run(user_question)
-                    st.write(response)
-
-
-
-
-# TO DO PLOTAI
-            # if user_file.name.endswith(".csv"):
-                # plot = PlotAI(user_file)
-
-
-
-
+                hadle_userinput(user_question)
+                # st.session_state.input_disable = False
 
 if __name__ == "__main__":
     main()
