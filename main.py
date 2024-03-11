@@ -13,12 +13,11 @@ import tempfile
 from langchain.document_loaders.csv_loader import CSVLoader
 
 
-def get_pdf_text(pdfs):
+def get_pdf_text(pdf):
     text = ''
-    for pdf in pdfs:
-        pdf_reader = PdfReader(pdf)
-        for page in pdf_reader.pages:
-            text += page.extract_text()
+    pdf_reader = PdfReader(pdf)
+    for page in pdf_reader.pages:
+        text += page.extract_text()
     return text
 
 def get_text_chunks(text):
@@ -67,7 +66,11 @@ def hadle_userinput(user_question):
         if i % 2 == 0:
             message(msg.content, is_user=True)
         else:
-            message(msg.content)
+            if "ERROR" in msg.content:
+                st.warning('ERROR: Input correct prompt.', icon="⚠️")
+            else:
+                message(msg.content)
+    # st.session_state.input_disable = False
 
 def button_callback():
     st.session_state.button_clicked = True
@@ -75,8 +78,8 @@ def button_callback():
 def uplader_callback():
     st.session_state.button_clicked = False
 
-def text_input_disable():
-    st.session_state.disabled = True
+# def text_input_disable():
+#     st.session_state.input_disable = True
 
 def main():
     callbacks = [StreamingStdOutCallbackHandler()]
@@ -87,6 +90,7 @@ def main():
         layout="centered",
         initial_sidebar_state="collapsed",
         )
+
     
     if "conversation" not in st.session_state:
         st.session_state.conversation = None
@@ -96,9 +100,11 @@ def main():
 
     if "button_clicked" not in st.session_state:
         st.session_state.button_clicked = False
+    if "csv_file_type" not in st.session_state:
+        st.session_state.csv_file_type = False
 
-    if "disabled" not in st.session_state:
-        st.session_state.input_disable = False
+    # if "input_disable" not in st.session_state:
+    #     st.session_state.input_disable = False
 
     st.header("Ask your docs 📜")
     user_file = st.file_uploader("Upload your docs", type=(["csv","pdf"]), on_change=uplader_callback)
@@ -106,6 +112,7 @@ def main():
     if user_file:
         if st.button("Process", use_container_width=True, on_click=button_callback):
             if user_file.name.endswith(".pdf"):
+                st.session_state.csv_file_type = False
                 with st.spinner("Processing..."):
                     # get pdf text
                     raw_text = get_pdf_text(user_file)
@@ -117,6 +124,7 @@ def main():
                     st.session_state.conversation = get_conversation_chain(vectorstore, llm)
 
             else:
+                st.session_state.csv_file_type = True
                 with st.spinner("Processing..."):
                     # get file data 
                     data = get_file_data(user_file)
@@ -127,15 +135,18 @@ def main():
                 
 
         if st.session_state.button_clicked:
-            # display dataframe
-            df = pd.DataFrame(pd.read_csv(user_file))
-            st.dataframe(df)
+            if st.session_state.csv_file_type:
+                # display dataframe
+                df = pd.DataFrame(pd.read_csv(user_file))
+                st.dataframe(df)
             # user question input
             # user_question = st.text_input("Ask a question about your document: ", disabled=st.session_state.input_disable, on_change=text_input_disable)
             user_question = st.text_input("Ask a question about your document: ")
             if user_question:
                 hadle_userinput(user_question)
-                # st.session_state.input_disable = False
+                st.balloons()
+
+                
 
 if __name__ == "__main__":
     main()
