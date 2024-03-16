@@ -70,16 +70,12 @@ def hadle_userinput(user_question):
                 st.warning('ERROR: Input correct prompt.', icon="⚠️")
             else:
                 message(msg.content)
-    # st.session_state.input_disable = False
 
 def button_callback():
     st.session_state.button_clicked = True
 
 def uplader_callback():
     st.session_state.button_clicked = False
-
-# def text_input_disable():
-#     st.session_state.input_disable = True
 
 def main():
     callbacks = [StreamingStdOutCallbackHandler()]
@@ -100,14 +96,12 @@ def main():
 
     if "button_clicked" not in st.session_state:
         st.session_state.button_clicked = False
+        
     if "csv_file_type" not in st.session_state:
         st.session_state.csv_file_type = False
 
-    # if "input_disable" not in st.session_state:
-    #     st.session_state.input_disable = False
-
     st.header("Ask your docs 📜")
-    user_file = st.file_uploader("Upload your docs", type=(["csv","pdf"]), on_change=uplader_callback)
+    user_file = st.file_uploader("Upload your file", type=(["csv","pdf"]), on_change=uplader_callback)
 
     if user_file:
         if st.button("Process", use_container_width=True, on_click=button_callback):
@@ -133,20 +127,16 @@ def main():
                     # create conversation chain
                     st.session_state.conversation = get_conversation_chain(vectorstore, llm)
                 
-
         if st.session_state.button_clicked:
             if st.session_state.csv_file_type:
                 # display dataframe
                 df = pd.DataFrame(pd.read_csv(user_file))
                 st.dataframe(df)
             # user question input
-            # user_question = st.text_input("Ask a question about your document: ", disabled=st.session_state.input_disable, on_change=text_input_disable)
             user_question = st.text_input("Ask a question about your document: ")
             if user_question:
-                hadle_userinput(user_question)
-                st.balloons()
-
-                
+                with st.spinner("Operation in progress. Please wait."):
+                    hadle_userinput(user_question)                
 
 if __name__ == "__main__":
     main()
