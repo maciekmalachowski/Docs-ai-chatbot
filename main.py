@@ -8,9 +8,9 @@ from langchain_community.embeddings import GPT4AllEmbeddings
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain_community.vectorstores import FAISS
+from langchain.document_loaders.csv_loader import CSVLoader
 from pypdf import PdfReader
 import tempfile
-from langchain.document_loaders.csv_loader import CSVLoader
 
 
 def get_pdf_text(pdf):

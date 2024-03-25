@@ -1,7 +1,7 @@
 streamlit
 langchain
-langchain_experimental
 tabulate
-plotai
+pypdf
+streamlit_chat==0.0.2.2
+gpt4all==2.2.1
 faiss-cpu
-GPT4All
