@@ -49,7 +49,7 @@ Streamlit will launch the *main.py* file contained in the folder and *automatica
 <h1 align="center" id="model">Model 📂</h1>
 
 #### Unfortunately, the model is too large to upload to this project, so you have to download it yourself. 
-#### It is very simple. Just go to the [GPT4ALL](https://gpt4all.io/index.html) and choose the model that suits you best. 
+#### It is very simple. Just go to the [GPT4ALL](https://docs.gpt4all.io/gpt4all_python/home.html) and choose the model that suits you best. 
 #### In this project, I am using `mistral-7b-instruct-v0.1.Q4_0.gguf`.
 #### Then place it in the `docs/model` folder.
 <br>
